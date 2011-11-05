@@ -40,25 +40,31 @@ def serve(force_rspec = false)
 
   ENV['RAILS_ENV'] = 'test' unless ENV['RAILS_ENV']
 
-  if File.exist? 'config/application.rb'
-    sec = Benchmark.realtime {
-      # We require config/application because that file (typically) loads Rails
-      # and any Bundler deps, as well as loading the initialization code for
-      # the app, but it doesn't actually perform the initialization. That happens
-      # in config/environment.
-      #
-      # In my experience that's the best we can do in terms of preloading. Rails
-      # and the gem dependencies rarely change and so don't need to be reloaded.
-      # But you can't initialize the application because any non-trivial app will
-      # involve it's models/controllers, etc. in its initialization, which you 
-      # definitely don't want to preload.
-      require File.expand_path 'config/application'
-    }
-    # This is the amount of time that you'll save on each subsequent test run.
-    puts "Preloaded Rails env in #{sec}s..."
-  else
-    warn "Could not find config/application.rb. Are you running this from the root of a Rails project?"
-  end
+  preload_file = if File.exist? 'config/application.rb'
+                   puts "Rails 3 app detected. Loading 'config/application.rb'..."
+                   'config/application.rb'
+                 elsif File.exist? 'config/boot.rb'
+                   puts "Rails 2 app detected. Loading 'config/boot.rb'..."
+                   'config/boot.rb'
+                 else
+                   abort "Could not find app framework. Are you running this from the root of a Rails project?"
+                 end
+
+  sec = Benchmark.realtime {
+    # We require config/application because that file (typically) loads Rails
+    # and any Bundler deps, as well as loading the initialization code for
+    # the app, but it doesn't actually perform the initialization. That happens
+    # in config/environment.
+    #
+    # In my experience that's the best we can do in terms of preloading. Rails
+    # and the gem dependencies rarely change and so don't need to be reloaded.
+    # But you can't initialize the application because any non-trivial app will
+    # involve it's models/controllers, etc. in its initialization, which you 
+    # definitely don't want to preload.
+    require File.expand_path preload_file
+  }
+  # This is the amount of time that you'll save on each subsequent test run.
+  puts "Preloaded Rails env in #{sec}s..."
 
   loop do
     # Since `spin push` reconnects each time it has new files for us we just
